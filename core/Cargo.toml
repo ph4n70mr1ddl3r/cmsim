@@ -1,0 +1,15 @@
+[package]
+name = "zksim-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ark-ff = "0.4"
+ark-std = "0.4"
+ark-bn254 = "0.4"
+ark-crypto-primitives = { version = "0.4", features = ["r1cs", "sponge"] }
+ark-serialize = "0.4"
+ethers-core = "2.0"
+hex = "0.4"
+rand = "0.8"
+thiserror = "1.0"

@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "core",
+    "circuits",
+    "cli"
+]
+resolver = "2"
