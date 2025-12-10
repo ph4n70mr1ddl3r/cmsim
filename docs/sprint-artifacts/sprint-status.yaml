@@ -43,8 +43,8 @@ story_location: docs/sprint-artifacts
 development_status:
   # Epic 1: Project Foundation & Build Infrastructure
   epic-1: in-progress
-  1-1-cmake-project-structure-dependencies: review
-  1-2-project-directory-structure: ready-for-dev
+  1-1-cmake-project-structure-dependencies: done
+  1-2-project-directory-structure: done
   1-3-coding-standards-style-enforcement: ready-for-dev
   epic-1-retrospective: optional
 

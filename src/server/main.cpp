@@ -1,6 +1,7 @@
 #include <iostream>
+#include <cstdlib>
 
 int main() {
   std::cout << "Hello from poker server!" << std::endl;
-  return 0;
+  return EXIT_SUCCESS;
 }

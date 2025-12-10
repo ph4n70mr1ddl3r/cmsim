@@ -6,6 +6,13 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Enable basic compiler warnings (Story 1.3 will add more)
+if(MSVC)
+  add_compile_options(/W4)
+else()
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
 # Include FetchContent module  
 include(FetchContent)
 
@@ -13,19 +20,14 @@ include(FetchContent)
 # Dependency Management
 # =============================================================================
 
-# Boost - Use system-installed for faster builds (Boost 1.83+ installed)
-message(STATUS "Finding Boost...")
-find_package(Boost 1.82 REQUIRED COMPONENTS system)
-if(NOT TARGET Boost::beast)
-  # Beast is header-only, create interface target
-  add_library(Boost::beast INTERFACE IMPORTED)
-  target_include_directories(Boost::beast INTERFACE ${Boost_INCLUDE_DIRS})
-endif()
-if(NOT TARGET Boost::asio)
-  # Asio is header-only, create interface target  
-  add_library(Boost::asio INTERFACE IMPORTED)
-  target_include_directories(Boost::asio INTERFACE ${Boost_INCLUDE_DIRS})
-endif()
+# Boost - Use FetchContent for cross-platform builds (per AC requirement)
+message(STATUS "Fetching Boost...")
+FetchContent_Declare(
+  Boost
+  URL https://github.com/boostorg/boost/releases/download/boost-1.83.0/boost-1.83.0.tar.gz
+  URL_HASH SHA256=0c6049764e80aa32754acd7d4f179fd5551d8172a83b71532ae093e7384e98da
+)
+FetchContent_MakeAvailable(Boost)
 
 # nlohmann/json
 message(STATUS "Fetching nlohmann/json...")
