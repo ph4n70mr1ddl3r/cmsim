@@ -7,8 +7,10 @@ UseTab: Never
 PointerAlignment: Left
 ReferenceAlignment: Left
 
-# Enforce snake_case (Note: clang-format doesn't enforce naming, but we document it)
-# Developers must manually follow snake_case convention
+# IMPORTANT: Architecture requires snake_case for all types, functions, and variables
+# clang-format cannot enforce naming conventions - developers must manually follow snake_case
+# Consider using clang-tidy or code reviews to enforce naming conventions
+# Member variables must have trailing underscore (e.g., my_variable_)
 
 # LIMITATION: Include ordering groups all project headers together (Priority 1)
 # Cannot enforce "own header first" - developers must manually ensure own header
@@ -24,10 +26,11 @@ IncludeCategories:
   - Regex:           '^".*\.hpp"$'
     Priority:        1
     SortPriority:    1
-  - Regex:           '^<c[a-z]+>$'
+  - Regex:           '^<c(?!h|o)[a-z]+>$'
     Priority:        2
     SortPriority:    2
-    # Matches C headers: <cstdio>, <cstring>, etc. (not <chrono>, <cassert>)
+    # Matches true C standard library headers: <cstdio>, <cstring>, <cmath>, etc.
+    # Excludes C++ headers starting with <ch (chrono) or <co (complex, condition_variable, coroutine, etc.)
   - Regex:           '^<[^/]+>$'
     Priority:        3
     SortPriority:    3
