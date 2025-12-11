@@ -1,0 +1,59 @@
+---
+Language: Cpp
+BasedOnStyle: Google
+IndentWidth: 2
+ColumnLimit: 120
+UseTab: Never
+PointerAlignment: Left
+ReferenceAlignment: Left
+
+# Enforce snake_case (Note: clang-format doesn't enforce naming, but we document it)
+# Developers must manually follow snake_case convention
+
+# LIMITATION: Include ordering groups all project headers together (Priority 1)
+# Cannot enforce "own header first" - developers must manually ensure own header
+# appears before other project headers in .cpp files (architecture requirement)
+
+# Bracing
+BreakBeforeBraces: Attach  # K&R style (opening brace on same line)
+
+# Include ordering
+SortIncludes: true
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex:           '^".*\.hpp"$'
+    Priority:        1
+    SortPriority:    1
+  - Regex:           '^<c[a-z]+>$'
+    Priority:        2
+    SortPriority:    2
+    # Matches C headers: <cstdio>, <cstring>, etc. (not <chrono>, <cassert>)
+  - Regex:           '^<[^/]+>$'
+    Priority:        3
+    SortPriority:    3
+  - Regex:           '^<boost/.*>$'
+    Priority:        4
+    SortPriority:    4
+  - Regex:           '^<nlohmann/.*>$'
+    Priority:        4
+    SortPriority:    4
+  - Regex:           '.*'
+    Priority:        5
+    SortPriority:    5
+
+# Spacing
+SpaceAfterCStyleCast: false
+SpaceBeforeParens: ControlStatements
+SpacesInAngles: false
+
+# Alignment
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignOperands: true
+
+# Other
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AlwaysBreakTemplateDeclarations: Yes
+---

@@ -6,12 +6,16 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Enable basic compiler warnings (Story 1.3 will add more)
-if(MSVC)
-  add_compile_options(/W4)
-else()
-  add_compile_options(-Wall -Wextra -Wpedantic)
-endif()
+# Include compiler warnings module
+include(cmake/CompilerWarnings.cmake)
+
+# Create interface library for project-wide settings
+add_library(project_options INTERFACE)
+target_compile_features(project_options INTERFACE cxx_std_17)
+
+# Create interface library for compiler warnings
+add_library(project_warnings INTERFACE)
+set_project_warnings(project_warnings)
 
 # Include FetchContent module  
 include(FetchContent)
@@ -61,6 +65,14 @@ add_subdirectory(src/client)
 # Enable testing at root (must be before adding tests subdirectory)
 enable_testing()
 add_subdirectory(tests)
+
+# Apply project-wide options and warnings to all targets
+target_link_libraries(poker_server PRIVATE project_options project_warnings)
+target_link_libraries(poker_client PRIVATE project_options project_warnings)
+# poker_common is an INTERFACE library (no sources yet) - it doesn't need warnings
+# Consumers (server/client) already link project_warnings above, which is sufficient
+# Warnings propagate through poker_common automatically since it's INTERFACE
+target_link_libraries(poker_tests PRIVATE project_options project_warnings)
 
 # =============================================================================
 # Summary
