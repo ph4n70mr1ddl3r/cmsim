@@ -1,6 +1,6 @@
 # Story 2.3: Handshake & Protocol Versioning
 
-**Status:** ready-for-dev
+**Status:** in-progress
 **Epic:** Epic 2 - Core Protocol & Network Communication
 **Story ID:** 2.3
 **Estimated Effort:** Small (4-8 hours)
@@ -90,6 +90,19 @@ So that **the server validates my client version**.
 - Test 1: Connect and send valid handshake -> Expect handshake response
 - Test 2: Connect and send invalid version -> Expect error and disconnection
 - Test 3: Connect and send garbage data -> Expect disconnection
+
+---
+
+## Tasks/Subtasks
+
+### Original Tasks (Reconstructed)
+- [x] Implement WebSocket session state machine `src/server/websocket_session.hpp`
+- [x] Implement handshake protocol logic `src/server/websocket_session.cpp`
+- [x] Create integration tests `tests/integration/handshake_test.cpp`
+
+### Review Follow-ups (AI)
+- [ ] [AI-Review][Medium] Update File List in `Dev Agent Record` with all implemented files
+- [ ] [AI-Review][Medium] Implement missing HandshakeTimeout test case (Scenario 4) `tests/integration/handshake_test.cpp`
 
 ---
 
