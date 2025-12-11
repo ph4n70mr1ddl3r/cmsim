@@ -49,8 +49,8 @@ development_status:
   epic-1-retrospective: optional
 
   # Epic 2: Core Protocol & Network Communication
-  epic-2: backlog
-  2-1-protocol-message-definitions: backlog
+  epic-2: in-progress
+  2-1-protocol-message-definitions: done
   2-2-websocket-server-with-connection-management: backlog
   2-3-handshake-protocol-versioning: backlog
   2-4-bidirectional-json-messaging: backlog

@@ -4,6 +4,7 @@ add_executable(poker_tests)
 target_sources(poker_tests
   PRIVATE
     placeholder_test.cpp
+    unit/protocol_test.cpp
 )
 
 # Link dependencies

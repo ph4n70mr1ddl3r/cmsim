@@ -1,15 +1,17 @@
 # Common library (shared protocol, poker rules, hand evaluator)
-# For now, create as INTERFACE library since we have no sources yet
-add_library(poker_common INTERFACE)
+add_library(poker_common STATIC
+  protocol.cpp
+  protocol.hpp
+)
 
 # Include directories
 target_include_directories(poker_common
-  INTERFACE
+  PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-# Link dependencies (will be used in future stories)
+# Link dependencies
 target_link_libraries(poker_common
-  INTERFACE
+  PUBLIC
     nlohmann_json::nlohmann_json
 )
