@@ -15,10 +15,22 @@ constexpr const char* PROTOCOL_VERSION = "v1.0";
 // Error Codes
 namespace error_codes {
 constexpr const char* INCOMPATIBLE_VERSION = "INCOMPATIBLE_VERSION";
-constexpr const char* PROTOCOL_VERSION_MISMATCH = "PROTOCOL_VERSION_MISMATCH"; // Use this or INCOMPATIBLE_VERSION? Kept INCOMPATIBLE_VERSION per story
+// constexpr const char* PROTOCOL_VERSION_MISMATCH = "PROTOCOL_VERSION_MISMATCH"; // Removed per code review
 constexpr const char* PROTOCOL_ERROR = "PROTOCOL_ERROR";
 constexpr const char* MALFORMED_HANDSHAKE = "MALFORMED_HANDSHAKE";
 constexpr const char* MALFORMED_MESSAGE = "MALFORMED_MESSAGE";
+}
+
+// Message Types
+namespace message_types {
+constexpr const char* HANDSHAKE = "HANDSHAKE";
+constexpr const char* HANDSHAKE_RESPONSE = "HANDSHAKE_RESPONSE";
+constexpr const char* ACTION = "ACTION";
+constexpr const char* STATE_UPDATE = "STATE_UPDATE";
+constexpr const char* ERROR = "ERROR";
+constexpr const char* RELOAD_REQUEST = "RELOAD_REQUEST";
+constexpr const char* RELOAD_RESPONSE = "RELOAD_RESPONSE";
+constexpr const char* DISCONNECT = "DISCONNECT";
 }
 
 // Player stack information for state updates
@@ -108,7 +120,7 @@ std::string serialize_reload_response(const reload_response_message& msg);
 
 // Protocols definitions
 
-// nlohmann/json serialization functions MUST be in global namespace
+// nlohmann/json serialization functions are in the same namespace for ADL support
 // Manual to_json/from_json for proper std::optional support
 
 inline void to_json(nlohmann::json& j, const cppsim::protocol::player_stack& p) {

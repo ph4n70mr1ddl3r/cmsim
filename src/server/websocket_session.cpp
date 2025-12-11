@@ -11,14 +11,22 @@ namespace {
 std::mutex log_mutex;
 
 void log_message(const std::string& msg) {
+  // TODO(Epic 7): Replace with centralized event bus logging (server_logger)
   std::lock_guard<std::mutex> lock(log_mutex);
   std::cout << msg << std::endl;
 }
 
+
 void log_error(const std::string& msg) {
+  // TODO(Epic 7): Replace with centralized event bus logging (server_logger)
   std::lock_guard<std::mutex> lock(log_mutex);
   std::cerr << msg << std::endl;
 }
+
+constexpr auto HANDSHAKE_TIMEOUT = std::chrono::seconds(10);
+constexpr auto IDLE_TIMEOUT = std::chrono::seconds(60);
+constexpr int PLACEHOLDER_SEAT = -1;
+constexpr double PLACEHOLDER_STACK = 0.0;
 }  // namespace
 
 namespace cppsim {
@@ -38,7 +46,7 @@ void websocket_session::run() {
           boost::beast::role_type::server));
 
   // Start the deadline timer for authentication
-  deadline_.expires_after(std::chrono::seconds(10));
+  deadline_.expires_after(HANDSHAKE_TIMEOUT);
   check_deadline();
 
   // Accept the websocket handshake
@@ -79,8 +87,8 @@ void websocket_session::on_read(boost::beast::error_code ec,
     std::stringstream ss;
     ss << "[WebSocketSession] Client disconnected: " << session_id_;
     log_message(ss.str());
-    if (conn_mgr_) {
-      conn_mgr_->unregister_session(session_id_);
+    if (auto mgr = conn_mgr_.lock()) {
+      mgr->unregister_session(session_id_);
     }
     return;
   }
@@ -89,8 +97,8 @@ void websocket_session::on_read(boost::beast::error_code ec,
     std::stringstream ss;
     ss << "[WebSocketSession] Read error for " << session_id_ << ": " << ec.message();
     log_error(ss.str());
-    if (conn_mgr_) {
-      conn_mgr_->unregister_session(session_id_);
+    if (auto mgr = conn_mgr_.lock()) {
+      mgr->unregister_session(session_id_);
     }
     return;
   }
@@ -99,115 +107,78 @@ void websocket_session::on_read(boost::beast::error_code ec,
   buffer_.consume(buffer_.size());
 
   if (state_ == state::unauthenticated) {
-    try {
-      auto json = nlohmann::json::parse(message);
-      protocol::message_envelope envelope = json.get<protocol::message_envelope>();
+    auto handshake_opt = protocol::parse_handshake(message);
 
-      if (envelope.message_type != "HANDSHAKE") {
-         log_error("[WebSocketSession] Handshake error: Protocol error (Not HANDSHAKE)");
-         // Send Error
-         protocol::error_message err;
-         err.error_code = protocol::error_codes::PROTOCOL_ERROR;
-         err.message = "Expected HANDSHAKE message";
-         
-         protocol::message_envelope err_env;
-         err_env.message_type = "ERROR";
-         err_env.protocol_version = protocol::PROTOCOL_VERSION;
-         nlohmann::json err_payload;
-         protocol::to_json(err_payload, err);
-         err_env.payload = err_payload;
-         
-         nlohmann::json j;
-         protocol::to_json(j, err_env);
-         
-         send(j.dump()); 
-         close();
-         return;
-      }
-
-      // Check Protocol Version
-      if (envelope.protocol_version != protocol::PROTOCOL_VERSION) {
-         std::stringstream ss;
-         ss << "[WebSocketSession] Handshake error: Incompatible version " << envelope.protocol_version;
-         log_error(ss.str());
-         protocol::error_message err;
-         err.error_code = protocol::error_codes::INCOMPATIBLE_VERSION;
-         err.message = "Expected " + std::string(protocol::PROTOCOL_VERSION);
-         
-         protocol::message_envelope err_env;
-         err_env.message_type = "ERROR";
-         err_env.protocol_version = protocol::PROTOCOL_VERSION;
-         nlohmann::json err_payload;
-         protocol::to_json(err_payload, err);
-         err_env.payload = err_payload;
-         
-         nlohmann::json j;
-         protocol::to_json(j, err_env);
-         
-         send(j.dump());
-         close();
-         return;
-      }
-
-      // Valid Handshake
-      state_ = state::authenticated;
-      deadline_.cancel(); // Cancel timeout
-      
-      // Register with connection manager
-      if (conn_mgr_) {
-          session_id_ = conn_mgr_->register_session(shared_from_this());
-      } else {
-          // Fallback if no manager - though constructor requires it
-          log_error("[WebSocketSession] Warning: No connection manager, session ID invalid"); 
-      }
-
-      std::stringstream ss;
-      ss << "[WebSocketSession] Handshake successful for session: " << session_id_;
-      log_message(ss.str());
-
-      protocol::handshake_response resp;
-      resp.session_id = session_id_;
-      resp.seat_number = -1; // Placeholder
-      resp.starting_stack = 0.0; // Placeholder
-      
-      protocol::message_envelope resp_env;
-      resp_env.message_type = "HANDSHAKE_RESPONSE";
-      resp_env.protocol_version = protocol::PROTOCOL_VERSION;
-      nlohmann::json resp_payload;
-      protocol::to_json(resp_payload, resp);
-      resp_env.payload = resp_payload;
-      
-      nlohmann::json j;
-      protocol::to_json(j, resp_env);
-      
-      send(j.dump());
-
-    } catch (const std::exception& e) {
-       std::stringstream ss;
-       ss << "[WebSocketSession] Handshake error: Malformed message - " << e.what();
-       log_error(ss.str());
-       protocol::error_message err;
-       err.error_code = protocol::error_codes::MALFORMED_HANDSHAKE;
-       err.message = e.what();
-       
-       protocol::message_envelope err_env;
-       err_env.message_type = "ERROR";
-       err_env.protocol_version = protocol::PROTOCOL_VERSION;
-       nlohmann::json err_payload;
-       protocol::to_json(err_payload, err);
-       err_env.payload = err_payload;
-       
-       nlohmann::json j;
-       protocol::to_json(j, err_env);
-       
-       send(j.dump());
-       close();
-       return;
+    if (!handshake_opt) {
+      log_error("[WebSocketSession] Handshake error: Protocol error (Not HANDSHAKE)");
+      // Send Error
+      protocol::error_message err;
+      err.error_code = protocol::error_codes::PROTOCOL_ERROR;
+      err.message = "Expected HANDSHAKE message";
+      send(protocol::serialize_error(err));
+      close();
+      return;
     }
+
+    const auto& handshake_msg = *handshake_opt;
+
+    // Check Protocol Version
+    if (handshake_msg.protocol_version != protocol::PROTOCOL_VERSION) {
+      std::stringstream ss;
+      ss << "[WebSocketSession] Handshake error: Incompatible version "
+         << handshake_msg.protocol_version;
+      log_error(ss.str());
+      protocol::error_message err;
+      err.error_code = protocol::error_codes::INCOMPATIBLE_VERSION;
+      err.message = "Expected " + std::string(protocol::PROTOCOL_VERSION);
+      send(protocol::serialize_error(err));
+      close();
+      return;
+    }
+
+    // Valid Handshake
+    // Valid Handshake
+    state_ = state::authenticated;
+    
+    // Store and Log Client Name if present
+    if (handshake_msg.client_name) {
+        client_name_ = *handshake_msg.client_name;
+        log_message("[WebSocketSession] Client Name: " + client_name_);
+    }
+    
+    // Set Idle Timeout
+    deadline_.expires_after(IDLE_TIMEOUT);
+    check_deadline();
+
+    // Register with connection manager
+    if (auto mgr = conn_mgr_.lock()) {
+      session_id_ = mgr->register_session(shared_from_this());
+    } else {
+      // Fallback if no manager - though constructor requires it
+      log_error(
+          "[WebSocketSession] Warning: No connection manager, session ID "
+          "invalid");
+    }
+
+    std::stringstream ss;
+    ss << "[WebSocketSession] Handshake successful for session: " << session_id_;
+    log_message(ss.str());
+
+    protocol::handshake_response resp;
+    resp.session_id = session_id_;
+    resp.seat_number = PLACEHOLDER_SEAT;      // Placeholder
+    resp.starting_stack = PLACEHOLDER_STACK;  // Placeholder
+
+    send(protocol::serialize_handshake_response(resp));
+  } else {
     // Authenticated - just log for now
     std::stringstream ss;
     ss << "[WebSocketSession] Received from " << session_id_ << ": " << message;
     log_message(ss.str());
+
+    // Reset Idle Timeout on activity
+    deadline_.expires_after(IDLE_TIMEOUT);
+    check_deadline();
   }
 
   // Continue reading
@@ -285,6 +256,12 @@ void websocket_session::check_deadline() {
            // Timeout occurred
            std::stringstream ss;
            ss << "[WebSocketSession] Handshake timeout for session " << self->session_id_;
+           log_error(ss.str());
+           self->close();
+        } else {
+           // Idle timeout
+           std::stringstream ss;
+           ss << "[WebSocketSession] Idle timeout for session " << self->session_id_;
            log_error(ss.str());
            self->close();
         }

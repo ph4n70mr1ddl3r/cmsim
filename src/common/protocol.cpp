@@ -1,91 +1,132 @@
 #include "protocol.hpp"
 
-#include <iostream>
-
 namespace cppsim {
 namespace protocol {
 
-// Parse handshake message from JSON string
+// Parsing functions
 std::optional<handshake_message> parse_handshake(const std::string& json_str) {
   try {
-    nlohmann::json j = nlohmann::json::parse(json_str);
+    auto j = nlohmann::json::parse(json_str);
+    auto envelope = j.get<message_envelope>();
+    if (envelope.message_type != message_types::HANDSHAKE) {
+      return std::nullopt;
+    }
+    // Extract payload from envelope
     handshake_message msg;
-    from_json(j, msg);
+    try {
+      from_json(envelope.payload, msg);
+    } catch (...) {
+       return std::nullopt;
+    }
+    
+    // Resolve Ambiguity: Envelope is the transport source of truth.
+    // If payload has a different version, we overwrite it with envelope's version
+    // to ensure internal consistency.
+    if (msg.protocol_version != envelope.protocol_version) {
+        msg.protocol_version = envelope.protocol_version;
+    }
+    
     return msg;
-  } catch (const nlohmann::json::exception& e) {
-    std::cerr << "Failed to parse handshake message: " << e.what() << std::endl;
+  } catch (...) {
     return std::nullopt;
   }
 }
 
-// Parse action message from JSON string
 std::optional<action_message> parse_action(const std::string& json_str) {
   try {
-    nlohmann::json j = nlohmann::json::parse(json_str);
+    auto j = nlohmann::json::parse(json_str);
+    auto envelope = j.get<message_envelope>();
+    if (envelope.message_type != message_types::ACTION) {
+      return std::nullopt;
+    }
     action_message msg;
-    from_json(j, msg);
+    from_json(envelope.payload, msg);
     return msg;
-  } catch (const nlohmann::json::exception& e) {
-    std::cerr << "Failed to parse action message: " << e.what() << std::endl;
+  } catch (...) {
     return std::nullopt;
   }
 }
 
-// Parse reload request message from JSON string
-std::optional<reload_request_message> parse_reload_request(
-    const std::string& json_str) {
+std::optional<reload_request_message> parse_reload_request(const std::string& json_str) {
   try {
-    nlohmann::json j = nlohmann::json::parse(json_str);
+    auto j = nlohmann::json::parse(json_str);
+    auto envelope = j.get<message_envelope>();
+    if (envelope.message_type != message_types::RELOAD_REQUEST) {
+      return std::nullopt;
+    }
     reload_request_message msg;
-    from_json(j, msg);
+    from_json(envelope.payload, msg);
     return msg;
-  } catch (const nlohmann::json::exception& e) {
-    std::cerr << "Failed to parse reload request message: " << e.what()
-              << std::endl;
+  } catch (...) {
     return std::nullopt;
   }
 }
 
-// Parse disconnect message from JSON string
-std::optional<disconnect_message> parse_disconnect(
-    const std::string& json_str) {
+std::optional<disconnect_message> parse_disconnect(const std::string& json_str) {
   try {
-    nlohmann::json j = nlohmann::json::parse(json_str);
+    auto j = nlohmann::json::parse(json_str);
+    auto envelope = j.get<message_envelope>();
+    if (envelope.message_type != message_types::DISCONNECT) {
+      return std::nullopt;
+    }
     disconnect_message msg;
-    from_json(j, msg);
+    from_json(envelope.payload, msg);
     return msg;
-  } catch (const nlohmann::json::exception& e) {
-    std::cerr << "Failed to parse disconnect message: " << e.what()
-              << std::endl;
+  } catch (...) {
     return std::nullopt;
   }
 }
 
-// Serialize state update message to JSON string
+// Serialization functions
 std::string serialize_state_update(const state_update_message& msg) {
+  message_envelope env;
+  env.message_type = message_types::STATE_UPDATE;
+  env.protocol_version = PROTOCOL_VERSION;
+  nlohmann::json payload;
+  to_json(payload, msg);
+  env.payload = payload;
+  
   nlohmann::json j;
-  to_json(j, msg);
+  to_json(j, env);
   return j.dump();
 }
 
-// Serialize error message to JSON string
 std::string serialize_error(const error_message& msg) {
+  message_envelope env;
+  env.message_type = message_types::ERROR;
+  env.protocol_version = PROTOCOL_VERSION;
+  nlohmann::json payload;
+  to_json(payload, msg);
+  env.payload = payload;
+  
   nlohmann::json j;
-  to_json(j, msg);
+  to_json(j, env);
   return j.dump();
 }
 
-// Serialize handshake response to JSON string
 std::string serialize_handshake_response(const handshake_response& msg) {
+  message_envelope env;
+  env.message_type = message_types::HANDSHAKE_RESPONSE;
+  env.protocol_version = PROTOCOL_VERSION;
+  nlohmann::json payload;
+  to_json(payload, msg);
+  env.payload = payload;
+  
   nlohmann::json j;
-  to_json(j, msg);
+  to_json(j, env);
   return j.dump();
 }
 
-// Serialize reload response to JSON string
 std::string serialize_reload_response(const reload_response_message& msg) {
+  message_envelope env;
+  env.message_type = message_types::RELOAD_RESPONSE;
+  env.protocol_version = PROTOCOL_VERSION;
+  nlohmann::json payload;
+  to_json(payload, msg);
+  env.payload = payload;
+  
   nlohmann::json j;
-  to_json(j, msg);
+  to_json(j, env);
   return j.dump();
 }
 

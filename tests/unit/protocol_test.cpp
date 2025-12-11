@@ -7,26 +7,30 @@ using namespace cppsim::protocol;
 // Test: handshake_message serialization
 TEST(ProtocolTest, HandshakeMessageSerialization) {
   handshake_message msg;
-  msg.protocol_version = "v1.0";
+  msg.protocol_version = PROTOCOL_VERSION;
   msg.client_name = "test_bot";
 
   nlohmann::json j;
   to_json(j, msg);
   std::string json_str = j.dump();
 
-  EXPECT_NE(json_str.find("\"protocol_version\":\"v1.0\""), std::string::npos);
+  EXPECT_NE(json_str.find(std::string("\"protocol_version\":\"") + PROTOCOL_VERSION + "\""), std::string::npos);
   EXPECT_NE(json_str.find("\"client_name\":\"test_bot\""), std::string::npos);
 }
 
 // Test: handshake_message deserialization
 TEST(ProtocolTest, HandshakeMessageDeserialization) {
-  std::string json_str =
-      R"({"protocol_version":"v1.0","client_name":"test_bot"})";
+  message_envelope env;
+  env.message_type = message_types::HANDSHAKE;
+  env.protocol_version = PROTOCOL_VERSION;
+  env.payload = {{"protocol_version", PROTOCOL_VERSION}, {"client_name", "test_bot"}};
 
-  auto msg = parse_handshake(json_str);
+  nlohmann::json j;
+  to_json(j, env);
+  auto msg = parse_handshake(j.dump());
 
   ASSERT_TRUE(msg.has_value());
-  EXPECT_EQ(msg->protocol_version, "v1.0");
+  EXPECT_EQ(msg->protocol_version, PROTOCOL_VERSION);
   ASSERT_TRUE(msg->client_name.has_value());
   EXPECT_EQ(msg->client_name.value(), "test_bot");
 }
@@ -34,14 +38,19 @@ TEST(ProtocolTest, HandshakeMessageDeserialization) {
 // Test: handshake_message round-trip
 TEST(ProtocolTest, HandshakeMessageRoundTrip) {
   handshake_message original;
-  original.protocol_version = "v1.0";
+  original.protocol_version = PROTOCOL_VERSION;
   original.client_name = "bot_alpha";
 
-  nlohmann::json j;
-  to_json(j, original);
-  std::string json_str = j.dump();
+  message_envelope env;
+  env.message_type = message_types::HANDSHAKE;
+  env.protocol_version = PROTOCOL_VERSION;
+  nlohmann::json payload;
+  to_json(payload, original);
+  env.payload = payload;
 
-  auto parsed = parse_handshake(json_str);
+  nlohmann::json j;
+  to_json(j, env);
+  auto parsed = parse_handshake(j.dump());
 
   ASSERT_TRUE(parsed.has_value());
   EXPECT_EQ(parsed->protocol_version, original.protocol_version);
@@ -50,12 +59,17 @@ TEST(ProtocolTest, HandshakeMessageRoundTrip) {
 
 // Test: handshake_message with optional field absent
 TEST(ProtocolTest, HandshakeMessageOptionalAbsent) {
-  std::string json_str = R"({"protocol_version":"v1.0"})";
+  message_envelope env;
+  env.message_type = message_types::HANDSHAKE;
+  env.protocol_version = PROTOCOL_VERSION;
+  env.payload = {{"protocol_version", PROTOCOL_VERSION}};
 
-  auto msg = parse_handshake(json_str);
+  nlohmann::json j;
+  to_json(j, env);
+  auto msg = parse_handshake(j.dump());
 
   ASSERT_TRUE(msg.has_value());
-  EXPECT_EQ(msg->protocol_version, "v1.0");
+  EXPECT_EQ(msg->protocol_version, PROTOCOL_VERSION);
   EXPECT_FALSE(msg->client_name.has_value());
 }
 
@@ -63,7 +77,11 @@ TEST(ProtocolTest, HandshakeMessageOptionalAbsent) {
 TEST(ProtocolTest, ActionMessageFold) {
   action_message msg;
   msg.session_id = "session123";
-  msg.action_type = "FOLD";
+  msg.action_type = "FOLD"; // Action types are not yet constants in protocol.hpp, or are they? Wait action_type is inside payload. message_types are for envelope.
+  // msg.action_type check: protocol.hpp VALID_ACTIONS? No. "FOLD" is correct in payload.
+  // env.message_type is not used here.
+  // Wait, line 87: EXPECT_NE(json_str.find("\"action_type\":\"FOLD\""), ...);
+  // I will leave action_type strings alone as they are values in the protocol, not message types.
   msg.sequence_number = 1;
 
   nlohmann::json j;
@@ -80,8 +98,15 @@ TEST(ProtocolTest, ActionMessageRaise) {
   msg.amount = 10.5;
   msg.sequence_number = 2;
 
+  message_envelope env;
+  env.message_type = message_types::ACTION;
+  env.protocol_version = PROTOCOL_VERSION;
+  nlohmann::json payload;
+  to_json(payload, msg);
+  env.payload = payload;
+
   nlohmann::json j;
-  to_json(j, msg);
+  to_json(j, env);
   auto parsed = parse_action(j.dump());
 
   ASSERT_TRUE(parsed.has_value());
@@ -105,11 +130,16 @@ TEST(ProtocolTest, StateUpdateMessageComplete) {
   std::string json_str = serialize_state_update(msg);
   nlohmann::json j = nlohmann::json::parse(json_str);
 
-  EXPECT_EQ(j["game_phase"], "FLOP");
-  EXPECT_DOUBLE_EQ(j["pot_size"], 15.5);
-  EXPECT_EQ(j["community_cards"].size(), 3);
-  EXPECT_EQ(j["hole_cards"].size(), 2);
-  EXPECT_EQ(j["acting_seat"], 1);
+  // Check envelope
+  EXPECT_EQ(j["message_type"], message_types::STATE_UPDATE);
+  
+  // Check payload
+  nlohmann::json payload = j["payload"];
+  EXPECT_EQ(payload["game_phase"], "FLOP");
+  EXPECT_DOUBLE_EQ(payload["pot_size"], 15.5);
+  EXPECT_EQ(payload["community_cards"].size(), 3);
+  EXPECT_EQ(payload["hole_cards"].size(), 2);
+  EXPECT_EQ(payload["acting_seat"], 1);
 }
 
 // Test: state_update_message with optional fields absent
@@ -124,10 +154,15 @@ TEST(ProtocolTest, StateUpdateMessageMinimal) {
   std::string json_str = serialize_state_update(msg);
   nlohmann::json j = nlohmann::json::parse(json_str);
 
-  EXPECT_EQ(j["game_phase"], "WAITING");
-  EXPECT_FALSE(j.contains("community_cards") && !j["community_cards"].is_null());
-  EXPECT_FALSE(j.contains("hole_cards") && !j["hole_cards"].is_null());
-  EXPECT_FALSE(j.contains("acting_seat") && !j["acting_seat"].is_null());
+  // Check envelope
+  EXPECT_EQ(j["message_type"], message_types::STATE_UPDATE);
+
+  // Check payload
+  nlohmann::json payload = j["payload"];
+  EXPECT_EQ(payload["game_phase"], "WAITING");
+  EXPECT_FALSE(payload.contains("community_cards") && !payload["community_cards"].is_null());
+  EXPECT_FALSE(payload.contains("hole_cards") && !payload["hole_cards"].is_null());
+  EXPECT_FALSE(payload.contains("acting_seat") && !payload["acting_seat"].is_null());
 }
 
 // Test: error_message serialization
@@ -151,8 +186,15 @@ TEST(ProtocolTest, ReloadRequestRoundTrip) {
   original.session_id = "session456";
   original.requested_amount = 100.0;
 
+  message_envelope env;
+  env.message_type = message_types::RELOAD_REQUEST;
+  env.protocol_version = PROTOCOL_VERSION;
+  nlohmann::json payload;
+  to_json(payload, original);
+  env.payload = payload;
+
   nlohmann::json j;
-  to_json(j, original);
+  to_json(j, env);
   auto parsed = parse_reload_request(j.dump());
 
   ASSERT_TRUE(parsed.has_value());
@@ -211,8 +253,15 @@ TEST(ProtocolTest, DisconnectMessage) {
   msg.session_id = "session789";
   msg.reason = "Client timeout";
 
+  message_envelope env;
+  env.message_type = message_types::DISCONNECT;
+  env.protocol_version = PROTOCOL_VERSION;
+  nlohmann::json payload;
+  to_json(payload, msg);
+  env.payload = payload;
+
   nlohmann::json j;
-  to_json(j, msg);
+  to_json(j, env);
   auto parsed = parse_disconnect(j.dump());
 
   ASSERT_TRUE(parsed.has_value());
@@ -224,9 +273,9 @@ TEST(ProtocolTest, DisconnectMessage) {
 // Test: message_envelope pattern
 TEST(ProtocolTest, MessageEnvelope) {
   message_envelope envelope;
-  envelope.message_type = "HANDSHAKE";
-  envelope.protocol_version = "v1.0";
-  envelope.payload = nlohmann::json{{"protocol_version", "v1.0"},
+  envelope.message_type = message_types::HANDSHAKE;
+  envelope.protocol_version = PROTOCOL_VERSION;
+  envelope.payload = nlohmann::json{{"protocol_version", PROTOCOL_VERSION},
                                      {"client_name", "test_bot"}};
 
   nlohmann::json j;
@@ -234,7 +283,7 @@ TEST(ProtocolTest, MessageEnvelope) {
   std::string json_str = j.dump();
 
   EXPECT_NE(json_str.find("\"message_type\":\"HANDSHAKE\""), std::string::npos);
-  EXPECT_NE(json_str.find("\"protocol_version\":\"v1.0\""), std::string::npos);
+  EXPECT_NE(json_str.find(std::string("\"protocol_version\":\"") + PROTOCOL_VERSION + "\""), std::string::npos);
 }
 
 // Test: Protocol version constant

@@ -1,6 +1,6 @@
 # Story 2.3: Handshake & Protocol Versioning
 
-**Status:** Ready for Review
+**Status:** In Progress
 **Epic:** Epic 2 - Core Protocol & Network Communication
 **Story ID:** 2.3
 **Estimated Effort:** Small (4-8 hours)
@@ -108,6 +108,20 @@ So that **the server validates my client version**.
 - [x] [AI-Review][Low] Use defined constants for error codes in `src/server/websocket_session.cpp`
 - [x] [AI-Review][Low] Implement thread-safe logging or mutex for console output
 
+### Review Follow-ups (AI) - Round 2
+- [x] [AI-Review][Medium] Hardcoded Version Strings in Tests `tests/unit/protocol_test.cpp`
+- [x] [AI-Review][Medium] Protocol Version Ambiguity (Envelope vs Payload) `src/common/protocol.cpp`
+- [x] [AI-Review][Low] No Keep-Alive/Idle Timeout `src/server/websocket_session.cpp`
+- [x] [AI-Review][Low] Unused Client Name `src/server/websocket_session.cpp`
+
+### Review Follow-ups (AI) - Round 3
+- [x] [AI-Review][Critical] Fix Memory Leak: Circular dependency between websocket_session and connection_manager `src/server/websocket_session.hpp`
+- [x] [AI-Review][Medium] Refactor `tests/integration/handshake_test.cpp` to use protocol constants
+- [x] [AI-Review][Low] Update misleading comment in `protocol.hpp` (global namespace vs ADL)
+
+### Review Follow-ups (AI) - Round 4
+- [ ] [AI-Review][Low] Unused Member Variable: `client_name_` is set but never used in `websocket_session` `src/server/websocket_session.hpp`
+
 ---
 
 ## Dev Notes
@@ -155,10 +169,22 @@ Gemini 2.0 Flash
 - Address all review follow-ups.
 - Added AI Review action items for session registration and thread safety.
 - Implemented session registration, error codes, and thread-safe logging (Review Follow-ups).
+- **Review Fixes**: Implemented central `protocol.cpp` parsing helpers, refactored `websocket_session.cpp` to use them + properly defined protocol constants.
+- **Code Review Fix**: Added `tests/unit/protocol_test.cpp` to File List.
+- **Round 2 & 3 Fixes**: Fixed circular dependency memory leak, replaced hardcoded strings with constants in tests, clarified protocol ambiguity, and stored client name.
 
 ### File List
 - src/common/protocol.hpp
+- src/common/protocol.cpp
 - src/server/websocket_session.hpp
 - src/server/websocket_session.cpp
 - tests/integration/handshake_test.cpp
+- tests/unit/protocol_test.cpp
+
+### Change Log
+- 2025-12-11: Implemented initial handshake protocol and tests.
+- 2025-12-11: Fixed critical issues from first AI review.
+- 2025-12-11: Second AI Review (Adversarial) - Added action items for code quality improvements. Status reverted to In Progress.
+- 2025-12-11: Third AI Review (Adversarial) - Added critical memory leak fix and test refactoring to action items.
+- 2025-12-11: Implemented Round 2 and Round 3 review fixes (Memory leak, constants, client name).
 

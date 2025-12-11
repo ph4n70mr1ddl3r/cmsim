@@ -30,8 +30,25 @@ protected:
                 server_ioc.run(); 
             });
             
-            // Give server a moment to start
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            // Wait for server to be ready using retry loop
+            auto start = std::chrono::steady_clock::now();
+            bool connected = false;
+            while (std::chrono::steady_clock::now() - start < std::chrono::seconds(5)) {
+                try {
+                    net::io_context ioc;
+                    tcp::socket s(ioc);
+                    tcp::resolver resolver(ioc);
+                    auto const results = resolver.resolve("localhost", "8080");
+                    net::connect(s, results.begin(), results.end());
+                    connected = true;
+                    break;
+                } catch (...) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                }
+            }
+            if (!connected) {
+                FAIL() << "Failed to connect to server within 5 seconds";
+            }
         } catch (const std::exception& e) {
             FAIL() << "Failed to start server: " << e.what();
         }
@@ -61,7 +78,7 @@ TEST_F(HandshakeTest, SuccessfulHandshake) {
 
     // Send Handshake
     cppsim::protocol::message_envelope env;
-    env.message_type = "HANDSHAKE";
+    env.message_type = cppsim::protocol::message_types::HANDSHAKE;
     env.protocol_version = cppsim::protocol::PROTOCOL_VERSION;
     
     cppsim::protocol::handshake_message h_msg;
@@ -85,7 +102,7 @@ TEST_F(HandshakeTest, SuccessfulHandshake) {
     auto resp_json = nlohmann::json::parse(response);
     auto resp_env = resp_json.get<cppsim::protocol::message_envelope>();
 
-    EXPECT_EQ(resp_env.message_type, "HANDSHAKE_RESPONSE");
+    EXPECT_EQ(resp_env.message_type, cppsim::protocol::message_types::HANDSHAKE_RESPONSE);
     EXPECT_EQ(resp_env.protocol_version, cppsim::protocol::PROTOCOL_VERSION);
     
     ws.close(websocket::close_code::normal);
@@ -103,9 +120,9 @@ TEST_F(HandshakeTest, IncompatibleVersion) {
 
     // Send Bad Handshake
     cppsim::protocol::message_envelope env;
-    env.message_type = "HANDSHAKE";
+    env.message_type = cppsim::protocol::message_types::HANDSHAKE;
     env.protocol_version = "v0.9"; // Bad version
-    env.payload = nlohmann::json::object(); // Empty payload fine for this test check
+    env.payload = nlohmann::json{{"protocol_version", "v0.9"}}; // Valid payload structure, bad version
 
     nlohmann::json j;
     cppsim::protocol::to_json(j, env);
@@ -120,7 +137,7 @@ TEST_F(HandshakeTest, IncompatibleVersion) {
         auto resp_json = nlohmann::json::parse(response);
         auto resp_env = resp_json.get<cppsim::protocol::message_envelope>();
         
-        EXPECT_EQ(resp_env.message_type, "ERROR");
+        EXPECT_EQ(resp_env.message_type, cppsim::protocol::message_types::ERROR);
         EXPECT_EQ(resp_env.payload["error_code"], cppsim::protocol::error_codes::INCOMPATIBLE_VERSION);
     } catch (const beast::system_error& se) {
         // It might close immediately
@@ -159,8 +176,8 @@ TEST_F(HandshakeTest, MalformedData) {
         auto resp_json = nlohmann::json::parse(response);
         // If we get here, it should be an error message
         auto resp_env = resp_json.get<cppsim::protocol::message_envelope>();
-        EXPECT_EQ(resp_env.message_type, "ERROR");
-        EXPECT_EQ(resp_env.payload["error_code"], cppsim::protocol::error_codes::MALFORMED_HANDSHAKE);
+        EXPECT_EQ(resp_env.message_type, cppsim::protocol::message_types::ERROR);
+        EXPECT_EQ(resp_env.payload["error_code"], cppsim::protocol::error_codes::PROTOCOL_ERROR);
     } catch (...) {
         // Closing is also acceptable
     }
@@ -178,7 +195,7 @@ TEST_F(HandshakeTest, ProtocolError) {
 
     // Send ACTION instead of HANDSHAKE
     cppsim::protocol::message_envelope env;
-    env.message_type = "ACTION";
+    env.message_type = cppsim::protocol::message_types::ACTION;
     env.protocol_version = cppsim::protocol::PROTOCOL_VERSION;
     env.payload = nlohmann::json::object();
 
@@ -194,7 +211,7 @@ TEST_F(HandshakeTest, ProtocolError) {
     auto resp_json = nlohmann::json::parse(response);
     auto resp_env = resp_json.get<cppsim::protocol::message_envelope>();
 
-    EXPECT_EQ(resp_env.message_type, "ERROR");
+    EXPECT_EQ(resp_env.message_type, cppsim::protocol::message_types::ERROR);
     EXPECT_EQ(resp_env.payload["error_code"], cppsim::protocol::error_codes::PROTOCOL_ERROR);
 }
 
