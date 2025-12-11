@@ -1,6 +1,6 @@
 # Story 2.3: Handshake & Protocol Versioning
 
-**Status:** in-progress
+**Status:** Ready for Review
 **Epic:** Epic 2 - Core Protocol & Network Communication
 **Story ID:** 2.3
 **Estimated Effort:** Small (4-8 hours)
@@ -101,8 +101,8 @@ So that **the server validates my client version**.
 - [x] Create integration tests `tests/integration/handshake_test.cpp`
 
 ### Review Follow-ups (AI)
-- [ ] [AI-Review][Medium] Update File List in `Dev Agent Record` with all implemented files
-- [ ] [AI-Review][Medium] Implement missing HandshakeTimeout test case (Scenario 4) `tests/integration/handshake_test.cpp`
+- [x] [AI-Review][Medium] Update File List in `Dev Agent Record` with all implemented files
+- [x] [AI-Review][Medium] Implement missing HandshakeTimeout test case (Scenario 4) `tests/integration/handshake_test.cpp`
 
 ---
 
@@ -146,6 +146,12 @@ Gemini 2.0 Flash
 ### Debug Log References
 
 ### Completion Notes List
+- Implemented `HandshakeTimeout` test in `tests/integration/handshake_test.cpp`.
+- Verified all Handshake scenarios pass (Success, Incompatible, Malformed, ProtocolError, Timeout).
+- Address all review follow-ups.
 
 ### File List
+- src/server/websocket_session.hpp
+- src/server/websocket_session.cpp
+- tests/integration/handshake_test.cpp
 

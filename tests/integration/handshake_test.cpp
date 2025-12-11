@@ -197,3 +197,30 @@ TEST_F(HandshakeTest, ProtocolError) {
     EXPECT_EQ(resp_env.message_type, "ERROR");
     EXPECT_EQ(resp_env.payload["error_code"], "PROTOCOL_ERROR");
 }
+
+// Test 5: Handshake Timeout
+TEST_F(HandshakeTest, HandshakeTimeout) {
+    net::io_context ioc;
+    tcp::resolver resolver(ioc);
+    websocket::stream<tcp::socket> ws(ioc);
+
+    auto const results = resolver.resolve("localhost", "8080");
+    net::connect(ws.next_layer(), results.begin(), results.end());
+    perform_handshake(ws);
+
+    // Initial read to make sure we are connected and timer starts on server
+    // (Though run() starts timer immediately upon accept).
+    
+    // Do NOTHING for > 10 seconds.
+    // We expect the server to close the connection efficiently.
+    // Instead of sleep, we can try to read. The read should fail with EOF/closed eventually.
+    
+    beast::flat_buffer buffer;
+    try {
+        // This read should block until the server closes the connection
+        ws.read(buffer);
+        FAIL() << "Should not have received any data, connection should close";
+    } catch (const beast::system_error& se) {
+        EXPECT_EQ(se.code(), websocket::error::closed);
+    }
+}
